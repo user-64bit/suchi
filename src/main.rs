@@ -1,20 +1,9 @@
-use clap::Parser;
-
-#[derive(Parser)]
-struct Args {
-    pattern: String,
-    path: std::path::PathBuf,
-}
+use std::io;
 
 fn main() {
-    let args = Args::parse();
-    let content = std::fs::read_to_string(&args.path);
-    match content {
-        Ok(data) => {
-            println!("file content {}", data);
-        }
-        Err(err) => {
-            println!("Error, {}", err);
-        }
-    }
+    println!("Enter your name :");
+    let mut name = String::new();
+    io::stdin().read_line(&mut name).expect("Failed to read line");
+
+    println!("Hello {}", name);
 }
