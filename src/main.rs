@@ -21,8 +21,8 @@ fn main() {
         match &command[..] {
             "show" => show(&suchi_path, &args[2..]),
             "add" => add(&suchi_path, &args[2..]),
-            "done" => toggle_done_undone(&suchi_path, &args[2..]),
-            "undone" => toggle_done_undone(&suchi_path, &args[2..]),
+            "done" => toggle_done_undone(&suchi_path, &args[2..], true),
+            "undone" => toggle_done_undone(&suchi_path, &args[2..], false),
             "delete" => delete(&suchi_path, &args[2..]),
             "edit" => edit(&suchi_path, &args[2..]),
             "clear" => clear(&suchi_path, &args[2..]),
@@ -162,7 +162,7 @@ fn delete(suchi_path: &String, args: &[String]) {
     }
 }
 
-fn toggle_done_undone(suchi_path: &String, args: &[String]) {
+fn toggle_done_undone(suchi_path: &String, args: &[String], flag:bool) {
     if args.is_empty() {
         println!("suchi done command takes atleast 1 argument.");
         process::exit(1);
@@ -189,12 +189,12 @@ fn toggle_done_undone(suchi_path: &String, args: &[String]) {
         }
         // 4. updating line
         let line_to_be_updated: &String = &lines[arg-1]; // 0 indexing
-        if let Some((progress, others)) = line_to_be_updated.split_once("] "){
+        if let Some((_progress, others)) = line_to_be_updated.split_once("] "){
             let mut new_line = "";
-            if progress == "[✗" {
+            if flag {
                 new_line = "[✓] ";
             }
-            else if progress == "[✓" {
+            else if !flag {
                 new_line = "[✗] ";
             }
             lines[arg-1] = new_line.to_string() + &others;
