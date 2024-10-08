@@ -1,5 +1,5 @@
 use chrono::{Datelike, Timelike};
-use std::fs::OpenOptions;
+use std::fs::{remove_file, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::{env, process};
 #[macro_use]
@@ -18,12 +18,12 @@ fn main() {
     if args.len() > 1 {
         let command = &args[1];
         match &command[..] {
-            "show" => show(&suchi_path),
+            "show" => show(&suchi_path, &args[2..]),
             "add" => add(&suchi_path, &args[2..]),
             "done" => println!("done todo, {:?}", &args[2..]),
             "delete" => println!("delete todo, {:?}", &args[2..]),
             "edit" => println!("edit todo, {:?}", &args[2..]),
-            "clear" => println!("clear todos, {:?}", &args[2..]),
+            "clear" => clear(&suchi_path, &args[2..]),
             "--help" | "help" | "-h" | _ => help(),
         }
     } else {
@@ -51,7 +51,6 @@ fn add(suchi_path: &String, args: &[String]) {
     let suchi_file = OpenOptions::new()
         .write(true)
         .append(true)
-        .create(true)
         .open(&suchi_path)
         .expect("Couldn't able to perform action.");
 
@@ -80,7 +79,11 @@ fn add(suchi_path: &String, args: &[String]) {
     }
 }
 
-fn show(suchi_path: &String) {
+fn show(suchi_path: &String, args: &[String]) {
+    if !args.is_empty(){
+        println!("suchi show command doesn't recognize: {:?}", &args);
+        process::exit(1);
+    }
     let mut number = 1;
     let mut table = Table::new();
     let suchi = OpenOptions::new()
@@ -88,7 +91,7 @@ fn show(suchi_path: &String) {
         .open(suchi_path)
         .expect("Couldn't able to perform action.");
 
-	// Headers
+    // Headers
     table.add_row(row!["number", "created_on", "task"]);
 
     let reader = BufReader::new(suchi);
@@ -100,6 +103,16 @@ fn show(suchi_path: &String) {
         }
     }
     table.printstd();
+}
+
+fn clear(suchi_path: &String, args: &[String]) {
+    if !args.is_empty(){
+        println!("suchi show command doesn't recognize: {:?}", &args);
+        process::exit(1);
+    }
+    remove_file(suchi_path).expect("Couldn't able to perform action");
+    println!("suchi cleared...")
+
 }
 
 const HELP: &str = r#"
