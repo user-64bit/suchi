@@ -214,8 +214,51 @@ fn toggle_done_undone(suchi_path: &String, args: &[String]) {
 }
 
 fn edit(suchi_path: &String, args: &[String]) {
-    // Todo: edit task
-    println!("{:?}, {:?}", &suchi_path, &args);
+    if args.is_empty() {
+        println!("suchi delete command takes atleast 1 argument.");
+        process::exit(1);
+    }
+    
+    if args.len() > 2 {
+        println!("Unrecognize commands: {:?}", &args[2..]);
+        process::exit(1);
+    }
+
+    let number_of_todo_edit:usize = args[0].parse::<usize>().expect("Error");
+    let updated_text = &args[1];
+    
+
+    // 2. Reading file
+    let suchi = OpenOptions::new()
+        .read(true)
+        .open(&suchi_path)
+        .expect("Couldn't able to perform action.");
+    let reader = BufReader::new(&suchi);
+    // 3. convert file to Vector of Strings to removing string become easy
+    let mut lines: Vec<String> = reader
+        .lines()
+        .collect::<Result<_, _>>()
+        .expect("Unable to read file.");
+
+    // 4. removing line
+    let old_text = &lines[number_of_todo_edit - 1];
+    if let Some((progress, others)) = old_text.split_once("] "){
+        if let Some((timestap, _task)) = others.split_once("] "){
+            let new_line = progress.to_string() + "] " +  timestap + "] " + updated_text;
+            lines[number_of_todo_edit - 1] = new_line;
+        }
+    }
+    // 5. Now overriding in file with updated Vector of strings(same as add() but with truncate=true)
+    let suchi = OpenOptions::new()
+        .write(true)
+        .truncate(true) // it will truncate the file to 0 length
+        .open(suchi_path)
+        .expect("Couldn't able to perform action.");
+    let mut writer = BufWriter::new(&suchi);
+    for line in &lines {
+        let line = format!("{}\n", line);
+        writer.write_all(line.as_bytes()).expect("Deleting failed");
+    }
 }
 
 const HELP: &str = r#"
