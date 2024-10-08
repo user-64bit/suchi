@@ -50,9 +50,12 @@ suchi is your fast, simple, and efficient task organizer written in Rust!
 
 ### Available Commands:
 
-- add [TASK]
-    Add a new task to your list.
-    Example: suchi add "Take a break and stretch"
+- add [TASKs]
+    Add a new task/tasks to your list.
+    Examples: 
+	suchi add "Take a break and stretch" "Watch Next Episode of One Peace"
+			OR
+	suchi add bat ball cat apple
 
 - edit [INDEX] [UPDATED TASK]
     Update an existing task by its index.
@@ -62,13 +65,13 @@ suchi is your fast, simple, and efficient task organizer written in Rust!
     Display all your tasks.
     Example: suchi show
 
-- done [INDEX]
-    Mark a task as complete by its index.
-    Example: suchi done 1 (marks the first task as completed)
+- done [INDEXs]
+    Mark a task/tasks as complete by its index.
+    Example: suchi done 1 2 (marks the first and second tasks as completed)
 
-- delete [INDEX]
-    Remove a task by its index.
-    Example: suchi delete 4 (removes the fourth task)
+- delete [INDEXs]
+    Remove a task/tasks by its index.
+    Example: suchi delete 4 5 (removes the fourth and fifth task)
 
 - clear
     Remove all tasks in one go.
