@@ -1,25 +1,24 @@
 use chrono::{Datelike, Timelike};
-use std::fmt::Error;
 use std::fs::OpenOptions;
-use std::io::{BufWriter, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::{env, process};
+#[macro_use]
+extern crate prettytable;
+use prettytable::Table;
 
 fn main() {
     let home: String = env::var("HOME").expect("HOME directory not found");
     let suchi_path = format!("{home}/.suchi");
 
     // initialization of .suchi
-    match init(&suchi_path) {
-        Ok(_) => println!("initializing...."),
-        Err(e) => println!("Error occured: {}", e),
-    };
+    init(&suchi_path);
 
     let args: Vec<String> = env::args().collect();
 
     if args.len() > 1 {
         let command = &args[1];
         match &command[..] {
-            "show" => println!("show todos, {:?}", &args[2..]),
+            "show" => show(&suchi_path),
             "add" => add(&suchi_path, &args[2..]),
             "done" => println!("done todo, {:?}", &args[2..]),
             "delete" => println!("delete todo, {:?}", &args[2..]),
@@ -32,7 +31,7 @@ fn main() {
     }
 }
 
-fn init(suchi_path: &String) -> Result<(), Error> {
+fn init(suchi_path: &String) {
     // if .suchi doesn't exits then create.
     let _file = OpenOptions::new()
         .read(true)
@@ -40,7 +39,6 @@ fn init(suchi_path: &String) -> Result<(), Error> {
         .append(true)
         .create(true)
         .open(&suchi_path);
-    Ok(())
 }
 
 fn add(suchi_path: &String, args: &[String]) {
@@ -68,12 +66,40 @@ fn add(suchi_path: &String, args: &[String]) {
         }
         let line = format!(
             "[{}-{}-{} {}:{}:{}] {}\n",
-            year, month, day, hours, minutes, seconds, arg
+            year,
+            month,
+            day,
+            hours,
+            minutes,
+            seconds,
+            arg.trim()
         );
         buffer
             .write_all(line.as_bytes())
             .expect("Couldn't able to write")
     }
+}
+
+fn show(suchi_path: &String) {
+    let mut number = 1;
+    let mut table = Table::new();
+    let suchi = OpenOptions::new()
+        .read(true)
+        .open(suchi_path)
+        .expect("Couldn't able to perform action.");
+
+	// Headers
+    table.add_row(row!["number", "created_on", "task"]);
+
+    let reader = BufReader::new(suchi);
+    for line in reader.lines() {
+        let line = line.expect("Failed to read line");
+        if let Some((timestamp, task)) = line.split_once("] ") {
+            table.add_row(row![number, &timestamp[1..], task]);
+            number += 1;
+        }
+    }
+    table.printstd();
 }
 
 const HELP: &str = r#"
