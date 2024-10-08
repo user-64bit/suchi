@@ -21,7 +21,8 @@ fn main() {
         match &command[..] {
             "show" => show(&suchi_path, &args[2..]),
             "add" => add(&suchi_path, &args[2..]),
-            "done" => done(&suchi_path, &args[2..]),
+            "done" => toggle_done_undone(&suchi_path, &args[2..]),
+            "undone" => toggle_done_undone(&suchi_path, &args[2..]),
             "delete" => delete(&suchi_path, &args[2..]),
             "edit" => edit(&suchi_path, &args[2..]),
             "clear" => clear(&suchi_path, &args[2..]),
@@ -65,7 +66,7 @@ fn add(suchi_path: &String, args: &[String]) {
             continue;
         }
         let line = format!(
-            "[{}-{}-{} {}:{}:{}] {}\n",
+            "[✗] [{}-{}-{} {}:{}:{}] {}\n",
             year,
             month,
             day,
@@ -93,15 +94,17 @@ fn show(suchi_path: &String, args: &[String]) {
         .expect("Couldn't able to perform action.");
 
     // Headers
-    table.add_row(row!["number", "created_on", "task"]);
+    table.add_row(row!["number", "created_on", "task", "progress"]);
 
     let reader = BufReader::new(&suchi);
     for line in reader.lines() {
         let line = line.expect("Failed to read line");
-        if let Some((timestamp, task)) = line.split_once("] ") {
-            table.add_row(row![number, &timestamp[1..], task]);
-            number += 1;
-        }
+        if let Some((progress, others)) = line.split_once("] "){
+            if let Some((timestamp, task)) =  others.split_once("] "){
+                table.add_row(row![number, &timestamp[1..], task, &progress[1..]]);
+                number += 1;
+            }
+        };
     }
     table.printstd();
 }
@@ -159,9 +162,55 @@ fn delete(suchi_path: &String, args: &[String]) {
     }
 }
 
-fn done(suchi_path: &String, args: &[String]) {
-    // Todo: add new column where it should show ✓ if task is done, otherwise ✗
-    println!("{:?}, {:?}", &suchi_path, &args);
+fn toggle_done_undone(suchi_path: &String, args: &[String]) {
+    if args.is_empty() {
+        println!("suchi done command takes atleast 1 argument.");
+        process::exit(1);
+    }
+    // 1. cleaning vector
+    let args: Vec<usize> = vector_cleaning(args);
+
+    // 2. Reading file
+    let suchi = OpenOptions::new()
+        .read(true)
+        .open(&suchi_path)
+        .expect("Couldn't able to perform action.");
+    let reader = BufReader::new(&suchi);
+    // 3. convert file to Vector of Strings to updating string become easy
+    let mut lines: Vec<String> = reader
+        .lines()
+        .collect::<Result<_, _>>()
+        .expect("Unable to read file.");
+
+    for arg in args {
+        if arg > lines.len() {
+            println!("Line number {:?} doesn't exists in file.", &arg);
+            process::exit(1);
+        }
+        // 4. updating line
+        let line_to_be_updated: &String = &lines[arg-1]; // 0 indexing
+        if let Some((progress, others)) = line_to_be_updated.split_once("] "){
+            let mut new_line = "";
+            if progress == "[✗" {
+                new_line = "[✓] ";
+            }
+            else if progress == "[✓" {
+                new_line = "[✗] ";
+            }
+            lines[arg-1] = new_line.to_string() + &others;
+        }
+    }
+    // 5. Now overriding in file with updated Vector of strings(same as add() but with truncate=true)
+    let suchi = OpenOptions::new()
+        .write(true)
+        .truncate(true) // it will truncate the file to 0 length
+        .open(suchi_path)
+        .expect("Couldn't able to perform action.");
+    let mut writer = BufWriter::new(&suchi);
+    for line in &lines {
+        let line = format!("{}\n", line);
+        writer.write_all(line.as_bytes()).expect("Deleting failed");
+    }
 }
 
 fn edit(suchi_path: &String, args: &[String]) {
@@ -197,6 +246,10 @@ suchi is your fast, simple, and efficient task organizer written in Rust!
 - done [INDEXs]
     Mark a task/tasks as complete by its index.
     Example: suchi done 1 2 (marks the first and second tasks as completed)
+
+- undone [INDEXs]
+    Mark a task/tasks as complete by its index.
+    Example: suchi undone 1 2 (marks the first and second tasks as completed)
 
 - delete [INDEXs]
     Remove a task/tasks by its index.
