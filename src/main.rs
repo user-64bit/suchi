@@ -1,4 +1,5 @@
 use chrono::{Datelike, Timelike};
+use std::collections::HashSet;
 use std::fs::{remove_file, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::{env, process};
@@ -20,9 +21,9 @@ fn main() {
         match &command[..] {
             "show" => show(&suchi_path, &args[2..]),
             "add" => add(&suchi_path, &args[2..]),
-            "done" => println!("done todo, {:?}", &args[2..]),
-            "delete" => println!("delete todo, {:?}", &args[2..]),
-            "edit" => println!("edit todo, {:?}", &args[2..]),
+            "done" => done(&suchi_path, &args[2..]),
+            "delete" => delete(&suchi_path, &args[2..]),
+            "edit" => edit(&suchi_path, &args[2..]),
             "clear" => clear(&suchi_path, &args[2..]),
             "--help" | "help" | "-h" | _ => help(),
         }
@@ -80,7 +81,7 @@ fn add(suchi_path: &String, args: &[String]) {
 }
 
 fn show(suchi_path: &String, args: &[String]) {
-    if !args.is_empty(){
+    if !args.is_empty() {
         println!("suchi show command doesn't recognize: {:?}", &args);
         process::exit(1);
     }
@@ -94,7 +95,7 @@ fn show(suchi_path: &String, args: &[String]) {
     // Headers
     table.add_row(row!["number", "created_on", "task"]);
 
-    let reader = BufReader::new(suchi);
+    let reader = BufReader::new(&suchi);
     for line in reader.lines() {
         let line = line.expect("Failed to read line");
         if let Some((timestamp, task)) = line.split_once("] ") {
@@ -106,13 +107,66 @@ fn show(suchi_path: &String, args: &[String]) {
 }
 
 fn clear(suchi_path: &String, args: &[String]) {
-    if !args.is_empty(){
+    if !args.is_empty() {
         println!("suchi show command doesn't recognize: {:?}", &args);
         process::exit(1);
     }
     remove_file(suchi_path).expect("Couldn't able to perform action");
     println!("suchi cleared...")
+}
 
+fn delete(suchi_path: &String, args: &[String]) {
+    // Todo: computation can be reduce
+
+    if args.is_empty() {
+        println!("suchi delete command takes atleast 1 argument.");
+        process::exit(1);
+    }
+    // 1. cleaning vector
+    let args: Vec<usize> = vector_cleaning(args);
+
+    // 2. Reading file
+    let suchi = OpenOptions::new()
+        .read(true)
+        .open(&suchi_path)
+        .expect("Couldn't able to perform action.");
+    let reader = BufReader::new(&suchi);
+    // 3. convert file to Vector of Strings to removing string become easy
+    let mut lines: Vec<String> = reader
+        .lines()
+        .collect::<Result<_, _>>()
+        .expect("Unable to read file.");
+
+    for arg in args {
+        if arg > lines.len() {
+            println!("Line number {:?} doesn't exists in file.", &arg);
+            process::exit(1);
+        }
+        // 4. removing line
+        lines.remove(arg - 1); // 0 indexing
+    }
+
+    // 5. Now overriding in file with updated Vector of strings(same as add() but with truncate=true)
+    let suchi = OpenOptions::new()
+        .write(true)
+        .truncate(true) // it will truncate the file to 0 length
+        .open(suchi_path)
+        .expect("Couldn't able to perform action.");
+    let mut writer = BufWriter::new(&suchi);
+    for line in &lines {
+        let line = format!("{}\n", line);
+        writer.write_all(line.as_bytes()).expect("Deleting failed");
+    }
+}
+
+fn done(suchi_path: &String, args: &[String]) {
+    // Todo: add new column where it should show ✓ if task is done, otherwise ✗
+    println!("{:?}, {:?}", &suchi_path, &args);
+}
+
+fn edit(suchi_path: &String, args: &[String]) {
+    // Todo: edit task
+    println!("{:?}, {:?}", &suchi_path, &args);
 }
 
 const HELP: &str = r#"
@@ -157,4 +211,36 @@ Pro Tip: Keep your tasks organized and stay productive with `suchi`!
 
 fn help() {
     println!("{}", HELP);
+}
+
+// helper functions
+
+fn vector_cleaning(vector: &[String]) -> Vec<usize> {
+    // Todo: delete this (this function is worst but it works)
+
+    // converting Vector of Strings to Vector of integer(usize here)
+    let mut vector_of_usize = Vec::new();
+    for v in vector {
+        vector_of_usize.push(v.parse::<usize>().expect("Error"));
+    }
+    /*
+        -> sorting and reversing Vector. but why?
+        because suppose someone put suchi delete 2 3 4
+        delete() function will delete 2nd line and because of that 4th line has become 3rd line
+        and 3rd line has become 2nd line
+    */
+    vector_of_usize.sort();
+    vector_of_usize.reverse();
+
+    // removing duplicates
+    let mut final_vector: Vec<usize> = Vec::new();
+    let mut map: HashSet<usize> = HashSet::new();
+
+    for v in vector_of_usize {
+        if !map.contains(&v) {
+            final_vector.push(v);
+        }
+        map.insert(v);
+    }
+    final_vector
 }
