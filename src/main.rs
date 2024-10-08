@@ -1,11 +1,16 @@
-use std::env;
+use chrono::{Datelike, Timelike};
 use std::fmt::Error;
 use std::fs::OpenOptions;
+use std::io::{BufWriter, Write};
+use std::{env, process};
 
 fn main() {
+    let home: String = env::var("HOME").expect("HOME directory not found");
+    let suchi_path = format!("{home}/.suchi");
+
     // initialization of .suchi
-    match init() {
-        Ok(_) => println!(".suchi file created at $HOME"),
+    match init(&suchi_path) {
+        Ok(_) => println!("initializing...."),
         Err(e) => println!("Error occured: {}", e),
     };
 
@@ -15,7 +20,7 @@ fn main() {
         let command = &args[1];
         match &command[..] {
             "show" => println!("show todos, {:?}", &args[2..]),
-            "add" => println!("add todo, {:?}", &args[2..]),
+            "add" => add(&suchi_path, &args[2..]),
             "done" => println!("done todo, {:?}", &args[2..]),
             "delete" => println!("delete todo, {:?}", &args[2..]),
             "edit" => println!("edit todo, {:?}", &args[2..]),
@@ -27,17 +32,48 @@ fn main() {
     }
 }
 
-fn init() -> Result<(), Error> {
-    let home: String = env::var("HOME").expect("HOME directory not found");
-    let suchi_path = format!("{home}/.suchi");
-	// if .suchi doesn't exits then create.
+fn init(suchi_path: &String) -> Result<(), Error> {
+    // if .suchi doesn't exits then create.
     let _file = OpenOptions::new()
         .read(true)
         .write(true)
         .append(true)
         .create(true)
-        .open(suchi_path);
+        .open(&suchi_path);
     Ok(())
+}
+
+fn add(suchi_path: &String, args: &[String]) {
+    if args.is_empty() {
+        println!("suchi add command takes atleast 1 argument.");
+        process::exit(1);
+    }
+
+    // if there isn't .suchi file it will create directly
+    let suchi_file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(&suchi_path)
+        .expect("Couldn't able to perform action.");
+
+    let now = chrono::Local::now();
+    let (hours, minutes, seconds) = (now.hour(), now.minute(), now.second());
+    let (year, month, day) = (now.year(), now.month(), now.day());
+
+    let mut buffer = BufWriter::new(suchi_file);
+    for arg in args {
+        if arg.trim().is_empty() {
+            continue;
+        }
+        let line = format!(
+            "[{}-{}-{} {}:{}:{}] {}\n",
+            year, month, day, hours, minutes, seconds, arg
+        );
+        buffer
+            .write_all(line.as_bytes())
+            .expect("Couldn't able to write")
+    }
 }
 
 const HELP: &str = r#"
