@@ -2,6 +2,14 @@
 name = "suchi"
 version = "0.1.0"
 edition = "2021"
+authors = ["user-64bit <arth.prajapati@outlook.com>"]
+license = "GPL-3.0-only"
+description = "A simple todo"
+readme = "README.md"
+homepage = "https://github.com/user-64bit/suchi"
+repository = "https://github.com/user-64bit/suchi"
+keywords = ["cli", "todo", "notes"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 chrono = "0.4.38"
