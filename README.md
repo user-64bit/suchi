@@ -1,14 +1,21 @@
 # suchi
 
+![suchi](suchi.gif)
+
 ##### [Note: The code of Repo might be(is) not good because I'm learning Rust while creating this project so it's not good and I know it so use it on your own risk.]
 
 suchi is your fast, simple, and efficient task organizer written in Rust!
 
-### Todo
-- Add installation guide
-- GIF showing all commands
-- etc
+### How to Use:
+First, install [Rust](https://www.rust-lang.org/tools/install)
+```
+cargo install suchi
+```
+### Setup Locally
 
+```
+git clone https://github.com/user-64bit/suchi.git && cargo install
+```
 
 ### Availabe Commands
 
