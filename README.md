@@ -17,7 +17,7 @@ cargo install suchi
 git clone https://github.com/user-64bit/suchi.git && cargo install
 ```
 
-### Availabe Commands
+### Availabel Commands
 
 ```
 - add [TASKs]

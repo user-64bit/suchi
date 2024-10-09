@@ -1,4 +1,4 @@
-use chrono::{Datelike, Timelike};
+use chrono;
 use std::collections::HashSet;
 use std::fs::{remove_file, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -8,7 +8,7 @@ extern crate prettytable;
 use prettytable::Table;
 
 fn main() {
-    let home: String = env::var("HOME").expect("HOME directory not found");
+    let home: String = env::var("HOME").unwrap_or_else(|_| "~".to_string());
     let suchi_path = format!("{home}/.suchi");
 
     // initialization of .suchi
@@ -19,13 +19,13 @@ fn main() {
     if args.len() > 1 {
         let command = &args[1];
         match &command[..] {
-            "show" => show(&suchi_path, &args[2..]),
+            "show" => show(&suchi_path),
             "add" => add(&suchi_path, &args[2..]),
             "done" => toggle_done_undone(&suchi_path, &args[2..], true),
             "undone" => toggle_done_undone(&suchi_path, &args[2..], false),
             "delete" => delete(&suchi_path, &args[2..]),
             "edit" => edit(&suchi_path, &args[2..]),
-            "clear" => clear(&suchi_path, &args[2..]),
+            "clear" => clear(&suchi_path),
             "--help" | "help" | "-h" | _ => help(),
         }
     } else {
@@ -33,7 +33,7 @@ fn main() {
     }
 }
 
-fn init(suchi_path: &String) {
+fn init(suchi_path: &str) {
     // if .suchi doesn't exits then create.
     let _file = OpenOptions::new()
         .read(true)
@@ -43,95 +43,113 @@ fn init(suchi_path: &String) {
         .open(&suchi_path);
 }
 
-fn add(suchi_path: &String, args: &[String]) {
+fn add(suchi_path: &str, args: &[String]) {
     if args.is_empty() {
-        println!("suchi add command takes atleast 1 argument.");
+        eprintln!(
+            r#"
+            ++===============================================++
+            ++`suchi add` command takes at least 1 argument. ++
+            ++ Use --help to know more about suchi. :)       ++
+            ++===============================================++
+            "#
+        );
         process::exit(1);
     }
 
-    // if there isn't .suchi file it will create directly
+    // handles if there is .suchi file already created.
     let suchi_file = OpenOptions::new()
         .write(true)
         .append(true)
-        .open(&suchi_path)
-        .expect("Couldn't able to perform action.");
+        .create(true)
+        .open(suchi_path)
+        .expect("Unable to open file.");
 
     let now = chrono::Local::now();
-    let (hours, minutes, seconds) = (now.hour(), now.minute(), now.second());
-    let (year, month, day) = (now.year(), now.month(), now.day());
+    let timestamp = now.format("%Y-%m-%d %H:%M:%S").to_string();
 
-    let mut buffer = BufWriter::new(suchi_file);
-    for arg in args {
-        if arg.trim().is_empty() {
-            continue;
-        }
-        let line = format!(
-            "[✗] [{}-{}-{} {}:{}:{}] {}\n",
-            year,
-            month,
-            day,
-            hours,
-            minutes,
-            seconds,
-            arg.trim()
-        );
-        buffer
-            .write_all(line.as_bytes())
-            .expect("Couldn't able to write")
+    let mut buffer: BufWriter<std::fs::File> = BufWriter::new(suchi_file);
+    for arg in args.iter().filter(|arg| !arg.trim().is_empty()) {
+        let line = format!("✗| {}| {}\n", timestamp, arg.trim());
+        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
     }
+    buffer.flush().expect("Failed to flush buffer..");
+    show(&suchi_path);
 }
 
-fn show(suchi_path: &String, args: &[String]) {
-    if !args.is_empty() {
-        println!("suchi show command doesn't recognize: {:?}", &args);
-        process::exit(1);
-    }
-    let mut number = 1;
+fn show(suchi_path: &str) {
     let mut table = Table::new();
     let suchi = OpenOptions::new()
         .read(true)
         .open(suchi_path)
-        .expect("Couldn't able to perform action.");
+        .expect("Unable open file.");
 
-    // Headers
-    table.add_row(row!["number", "created_on", "task", "progress"]);
+    let reader = BufReader::new(suchi);
+    let mut flag = true;
+    let mut index = 1;
 
-    let reader = BufReader::new(&suchi);
     for line in reader.lines() {
         let line = line.expect("Failed to read line");
-        if let Some((progress, others)) = line.split_once("] "){
-            if let Some((timestamp, task)) =  others.split_once("] "){
-                table.add_row(row![number, &timestamp[1..], task, &progress[1..]]);
-                number += 1;
+        if line.trim().is_empty() {
+            continue;
+        }
+        if line.len() > 0 && flag {
+            flag = false;
+            table.add_row(row!["#", "created_on", "task", "progress"]);
+        }
+        if let Some((progress, remaining)) = line.split_once("| ") {
+            if let Some((timestamp, task)) = remaining.split_once("| ") {
+                table.add_row(row![index, timestamp, task, progress]);
+                index += 1;
             }
         };
     }
-    table.printstd();
-}
-
-fn clear(suchi_path: &String, args: &[String]) {
-    if !args.is_empty() {
-        println!("suchi show command doesn't recognize: {:?}", &args);
-        process::exit(1);
+    if !flag {
+        table.printstd();
+    } else {
+        eprintln!(
+            r#"
+            ++===============================================++
+            ++ You haven't added anything to suchi yet.      ++
+            ++ Use --help to know more about suchi. :)       ++
+            ++===============================================++
+            "#
+        );
     }
-    remove_file(suchi_path).expect("Couldn't able to perform action");
-    println!("suchi cleared...")
 }
 
-fn delete(suchi_path: &String, args: &[String]) {
+fn clear(suchi_path: &str) {
+    remove_file(suchi_path).expect("Unable to locate file.");
+    println!(
+        r#"
+        ++===============================================++
+        ++ All the data in your suchi has been cleared.  ++
+        ++===============================================++
+        "#
+    );
+}
+
+fn delete(suchi_path: &str, args: &[String]) {
     // Todo: computation can be reduce
 
     if args.is_empty() {
-        println!("suchi delete command takes atleast 1 argument.");
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++`suchi delete` command takes at least 1 argument. ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#
+        );
         process::exit(1);
     }
-    // 1. cleaning vector
-    let args: Vec<usize> = vector_cleaning(args);
+
+    // 1. cleaning args
+    let args: Vec<usize> = args_cleaning(args);
 
     // 2. Reading file
     let suchi = OpenOptions::new()
         .read(true)
-        .open(&suchi_path)
+        .open(suchi_path)
         .expect("Couldn't able to perform action.");
     let reader = BufReader::new(&suchi);
     // 3. convert file to Vector of Strings to removing string become easy
@@ -154,28 +172,41 @@ fn delete(suchi_path: &String, args: &[String]) {
         .write(true)
         .truncate(true) // it will truncate the file to 0 length
         .open(suchi_path)
-        .expect("Couldn't able to perform action.");
-    let mut writer = BufWriter::new(&suchi);
+        .expect("Unable to open file.");
+    let mut buffer = BufWriter::new(&suchi);
     for line in &lines {
+        if line.trim().is_empty(){
+            continue;
+        }
         let line = format!("{}\n", line);
-        writer.write_all(line.as_bytes()).expect("Deleting failed");
+        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
     }
+    buffer.flush().expect("Failed to flush buffer..");
+    show(&suchi_path);
 }
 
-fn toggle_done_undone(suchi_path: &String, args: &[String], flag:bool) {
+fn toggle_done_undone(suchi_path: &str, args: &[String], flag: bool) {
     if args.is_empty() {
-        println!("suchi done command takes atleast 1 argument.");
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++`suchi [un]done` command takes at least 1 argument. ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#
+        );
         process::exit(1);
     }
-    // 1. cleaning vector
-    let args: Vec<usize> = vector_cleaning(args);
+    // 1. cleaning args
+    let args: Vec<usize> = args_cleaning(args);
 
     // 2. Reading file
     let suchi = OpenOptions::new()
         .read(true)
         .open(&suchi_path)
-        .expect("Couldn't able to perform action.");
+        .expect("Unable to open file.");
     let reader = BufReader::new(&suchi);
+
     // 3. convert file to Vector of Strings to updating string become easy
     let mut lines: Vec<String> = reader
         .lines()
@@ -188,16 +219,16 @@ fn toggle_done_undone(suchi_path: &String, args: &[String], flag:bool) {
             process::exit(1);
         }
         // 4. updating line
-        let line_to_be_updated: &String = &lines[arg-1]; // 0 indexing
-        if let Some((_progress, others)) = line_to_be_updated.split_once("] "){
+        let line_to_be_updated: &String = &lines[arg - 1]; // 0 indexing
+        if let Some((_progress, others)) = line_to_be_updated.split_once("| ") {
             let mut new_line = "";
             if flag {
-                new_line = "[✓] ";
+                new_line = "✓| ";
+            } else if !flag {
+                new_line = "✗| ";
             }
-            else if !flag {
-                new_line = "[✗] ";
-            }
-            lines[arg-1] = new_line.to_string() + &others;
+            // println!("{new_line}{others}-{arg}");
+            lines[arg - 1] = new_line.to_string() + others;
         }
     }
     // 5. Now overriding in file with updated Vector of strings(same as add() but with truncate=true)
@@ -205,28 +236,46 @@ fn toggle_done_undone(suchi_path: &String, args: &[String], flag:bool) {
         .write(true)
         .truncate(true) // it will truncate the file to 0 length
         .open(suchi_path)
-        .expect("Couldn't able to perform action.");
-    let mut writer = BufWriter::new(&suchi);
+        .expect("Unable to open file.");
+    let mut buffer = BufWriter::new(&suchi);
     for line in &lines {
+        if line.trim().is_empty(){
+            continue;
+        }
         let line = format!("{}\n", line);
-        writer.write_all(line.as_bytes()).expect("Deleting failed");
+        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
     }
+    buffer.flush().expect("Failed to flush buffer..");
+    show(&suchi_path);
 }
 
-fn edit(suchi_path: &String, args: &[String]) {
+fn edit(suchi_path: &str, args: &[String]) {
     if args.is_empty() {
-        println!("suchi delete command takes atleast 1 argument.");
-        process::exit(1);
-    }
-    
-    if args.len() > 2 {
-        println!("Unrecognize commands: {:?}", &args[2..]);
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++`suchi edit` command takes at least 1 argument.   ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#
+        );
         process::exit(1);
     }
 
-    let number_of_todo_edit:usize = args[0].parse::<usize>().expect("Error");
+    if args.len() > 2 {
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++ Unrecognize commands: {:?}                       ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#, &args[2..]
+        );
+        process::exit(1);
+    }
+
+    let number_of_todo_edit: usize = args[0].parse::<usize>().expect("Error");
     let updated_text = &args[1];
-    
 
     // 2. Reading file
     let suchi = OpenOptions::new()
@@ -242,26 +291,37 @@ fn edit(suchi_path: &String, args: &[String]) {
 
     // 4. removing line
     let old_text = &lines[number_of_todo_edit - 1];
-    if let Some((progress, others)) = old_text.split_once("] "){
-        if let Some((timestap, _task)) = others.split_once("] "){
-            let new_line = progress.to_string() + "] " +  timestap + "] " + updated_text;
+    if let Some((progress, others)) = old_text.split_once("| ") {
+        if let Some((timestap, _task)) = others.split_once("| ") {
+            let new_line = progress.to_string() + "| " + timestap + "| " + updated_text;
             lines[number_of_todo_edit - 1] = new_line;
         }
     }
+
     // 5. Now overriding in file with updated Vector of strings(same as add() but with truncate=true)
     let suchi = OpenOptions::new()
         .write(true)
         .truncate(true) // it will truncate the file to 0 length
         .open(suchi_path)
-        .expect("Couldn't able to perform action.");
-    let mut writer = BufWriter::new(&suchi);
+        .expect("Unable to open file.");
+    let mut buffer = BufWriter::new(&suchi);
     for line in &lines {
+        if line.trim().is_empty(){
+            continue;
+        }
         let line = format!("{}\n", line);
-        writer.write_all(line.as_bytes()).expect("Deleting failed");
+        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
     }
+    buffer.flush().expect("Failed to flush buffer..");
+    show(&suchi_path);
 }
 
 const HELP: &str = r#"
+ ___ _   _  ___| |__ (_)
+/ __| | | |/ __| '_ \| |
+\__ \ |_| | (__| | | | |
+|___/\__,_|\___|_| |_|_|
+
 Usage: suchi [COMMAND] [OPTIONS]
 
 suchi is your fast, simple, and efficient task organizer written in Rust!
@@ -311,10 +371,9 @@ fn help() {
 
 // helper functions
 
-fn vector_cleaning(vector: &[String]) -> Vec<usize> {
-    // Todo: delete this (this function is worst but it works)
-
+fn args_cleaning(vector: &[String]) -> Vec<usize> {
     // converting Vector of Strings to Vector of integer(usize here)
+    // Todo: use filter_map()
     let mut vector_of_usize = Vec::new();
     for v in vector {
         vector_of_usize.push(v.parse::<usize>().expect("Error"));
@@ -329,6 +388,7 @@ fn vector_cleaning(vector: &[String]) -> Vec<usize> {
     vector_of_usize.reverse();
 
     // removing duplicates
+    // Todo: use dedup()
     let mut final_vector: Vec<usize> = Vec::new();
     let mut map: HashSet<usize> = HashSet::new();
 
