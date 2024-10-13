@@ -14,7 +14,7 @@ cargo install suchi
 ### Setup Locally
 
 ```
-git clone https://github.com/user-64bit/suchi.git && cargo install
+git clone https://github.com/user-64bit/suchi.git && cd suchi && cargo install
 ```
 
 ### Availabel Commands
@@ -42,6 +42,10 @@ git clone https://github.com/user-64bit/suchi.git && cargo install
 - undone [INDEXs]
     Mark a task/tasks as complete by its index.
     Example: suchi undone 1 2 (marks the first and second tasks as completed)
+
+- filter done/undone
+    Filters task by done or undone tasks
+    Example: suchi filter done (gives all the done tasks)
 
 - delete [INDEXs]
     Remove a task/tasks by its index.

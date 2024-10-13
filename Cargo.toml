@@ -1,6 +1,6 @@
 [package]
 name = "suchi"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["user-64bit <arth.prajapati@outlook.com>"]
 license = "GPL-3.0-only"
@@ -10,6 +10,7 @@ homepage = "https://github.com/user-64bit/suchi"
 repository = "https://github.com/user-64bit/suchi"
 keywords = ["cli", "todo", "notes"]
 categories = ["command-line-utilities"]
+ignore=['suchi.gif']
 
 [dependencies]
 chrono = "0.4.38"

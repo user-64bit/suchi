@@ -25,11 +25,12 @@ fn main() {
             "undone" => toggle_done_undone(&suchi_path, &args[2..], false),
             "delete" => delete(&suchi_path, &args[2..]),
             "edit" => edit(&suchi_path, &args[2..]),
+            "filter" => filter(&suchi_path, &args[2..]),
             "clear" => clear(&suchi_path),
             "--help" | "help" | "-h" | _ => help(),
         }
     } else {
-        help();
+        show(&suchi_path);
     }
 }
 
@@ -70,51 +71,26 @@ fn add(suchi_path: &str, args: &[String]) {
     let mut buffer: BufWriter<std::fs::File> = BufWriter::new(suchi_file);
     for arg in args.iter().filter(|arg| !arg.trim().is_empty()) {
         let line = format!("✗| {}| {}\n", timestamp, arg.trim());
-        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
+        buffer
+            .write_all(line.as_bytes())
+            .expect("Couldn't able to write")
     }
     buffer.flush().expect("Failed to flush buffer..");
     show(&suchi_path);
 }
 
 fn show(suchi_path: &str) {
-    let mut table = Table::new();
     let suchi = OpenOptions::new()
         .read(true)
         .open(suchi_path)
         .expect("Unable open file.");
 
     let reader = BufReader::new(suchi);
-    let mut flag = true;
-    let mut index = 1;
-
-    for line in reader.lines() {
-        let line = line.expect("Failed to read line");
-        if line.trim().is_empty() {
-            continue;
-        }
-        if line.len() > 0 && flag {
-            flag = false;
-            table.add_row(row!["#", "created_on", "task", "progress"]);
-        }
-        if let Some((progress, remaining)) = line.split_once("| ") {
-            if let Some((timestamp, task)) = remaining.split_once("| ") {
-                table.add_row(row![index, timestamp, task, progress]);
-                index += 1;
-            }
-        };
-    }
-    if !flag {
-        table.printstd();
-    } else {
-        eprintln!(
-            r#"
-            ++===============================================++
-            ++ You haven't added anything to suchi yet.      ++
-            ++ Use --help to know more about suchi. :)       ++
-            ++===============================================++
-            "#
-        );
-    }
+    let lines = reader
+        .lines()
+        .collect::<Result<_, _>>()
+        .expect("Unable to read file.");
+    print_table(&lines);
 }
 
 fn clear(suchi_path: &str) {
@@ -175,11 +151,13 @@ fn delete(suchi_path: &str, args: &[String]) {
         .expect("Unable to open file.");
     let mut buffer = BufWriter::new(&suchi);
     for line in &lines {
-        if line.trim().is_empty(){
+        if line.trim().is_empty() {
             continue;
         }
         let line = format!("{}\n", line);
-        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
+        buffer
+            .write_all(line.as_bytes())
+            .expect("Couldn't able to write")
     }
     buffer.flush().expect("Failed to flush buffer..");
     show(&suchi_path);
@@ -239,11 +217,13 @@ fn toggle_done_undone(suchi_path: &str, args: &[String], flag: bool) {
         .expect("Unable to open file.");
     let mut buffer = BufWriter::new(&suchi);
     for line in &lines {
-        if line.trim().is_empty(){
+        if line.trim().is_empty() {
             continue;
         }
         let line = format!("{}\n", line);
-        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
+        buffer
+            .write_all(line.as_bytes())
+            .expect("Couldn't able to write")
     }
     buffer.flush().expect("Failed to flush buffer..");
     show(&suchi_path);
@@ -269,7 +249,8 @@ fn edit(suchi_path: &str, args: &[String]) {
             ++ Unrecognize commands: {:?}                       ++
             ++ Use --help to know more about suchi. :)          ++
             ++==================================================++
-            "#, &args[2..]
+            "#,
+            &args[2..]
         );
         process::exit(1);
     }
@@ -306,14 +287,79 @@ fn edit(suchi_path: &str, args: &[String]) {
         .expect("Unable to open file.");
     let mut buffer = BufWriter::new(&suchi);
     for line in &lines {
-        if line.trim().is_empty(){
+        if line.trim().is_empty() {
             continue;
         }
         let line = format!("{}\n", line);
-        buffer.write_all(line.as_bytes()).expect("Couldn't able to write")
+        buffer
+            .write_all(line.as_bytes())
+            .expect("Couldn't able to write")
     }
     buffer.flush().expect("Failed to flush buffer..");
     show(&suchi_path);
+}
+
+fn filter(suchi_path: &str, args: &[String]) {
+    if args.is_empty() {
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++`suchi filter` command takes at least 1 argument. ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#
+        );
+        process::exit(1);
+    }
+    // Todo: Right Now we only support "done" and "undone" filter (modify below condition if you want to add more)
+    if args.len() > 1 {
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++ Unrecognize commands: {:?}                       ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#,
+            &args[2..]
+        );
+        process::exit(1);
+    }
+    let filter_type = &args[0];
+    println!("{}", filter_type);
+    if filter_type.trim() != "done" && filter_type.trim() != "undone" {
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++ Unrecognize commands: {:?}                       ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#,
+            &args
+        );
+        process::exit(1);
+    };
+
+    let progress_mark: &str = if filter_type == "done" { "✓" } else { "✗" };
+    let reader = BufReader::new(
+        OpenOptions::new()
+            .read(true)
+            .open(suchi_path)
+            .expect("Couldn't able to perform action."),
+    );
+    let lines: Vec<String> = reader
+        .lines()
+        .collect::<Result<_, _>>()
+        .expect("Unable to read file.");
+
+    let mut filter_lines: Vec<String> = vec![];
+    for line in &lines {
+        if let Some((progress, _)) = line.split_once("| ") {
+            if progress == progress_mark {
+                filter_lines.push(line.to_string());
+            }
+        }
+    }
+    print_table(&filter_lines);
 }
 
 const HELP: &str = r#"
@@ -370,6 +416,39 @@ fn help() {
 }
 
 // helper functions
+
+fn print_table(lines: &Vec<String>) {
+    let mut table = Table::new();
+    let mut flag = true;
+    let mut index = 1;
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if line.len() > 0 && flag {
+            flag = false;
+            table.add_row(row!["#", "created_on", "task", "progress"]);
+        }
+        if let Some((progress, remaining)) = line.split_once("| ") {
+            if let Some((timestamp, task)) = remaining.split_once("| ") {
+                table.add_row(row![index, timestamp, task, progress]);
+                index += 1;
+            }
+        };
+    }
+    if !flag {
+        table.printstd();
+    } else {
+        eprintln!(
+            r#"
+            ++===============================================++
+            ++ You haven't added anything to suchi yet.      ++
+            ++ Use --help to know more about suchi. :)       ++
+            ++===============================================++
+            "#
+        );
+    }
+}
 
 fn args_cleaning(vector: &[String]) -> Vec<usize> {
     // converting Vector of Strings to Vector of integer(usize here)
