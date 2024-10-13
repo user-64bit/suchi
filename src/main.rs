@@ -26,6 +26,7 @@ fn main() {
             "delete" => delete(&suchi_path, &args[2..]),
             "edit" => edit(&suchi_path, &args[2..]),
             "filter" => filter(&suchi_path, &args[2..]),
+            "search" => search(&suchi_path, &args[2..]),
             "clear" => clear(&suchi_path),
             "--help" | "help" | "-h" | _ => help(),
         }
@@ -80,17 +81,44 @@ fn add(suchi_path: &str, args: &[String]) {
 }
 
 fn show(suchi_path: &str) {
+    let mut table = Table::new();
     let suchi = OpenOptions::new()
         .read(true)
         .open(suchi_path)
         .expect("Unable open file.");
 
     let reader = BufReader::new(suchi);
-    let lines = reader
-        .lines()
-        .collect::<Result<_, _>>()
-        .expect("Unable to read file.");
-    print_table(&lines);
+    let mut flag = true;
+    let mut index = 1;
+
+    for line in reader.lines() {
+        let line = line.expect("unable to read line.");
+        if line.trim().is_empty() {
+            continue;
+        }
+        if line.len() > 0 && flag {
+            flag = false;
+            table.add_row(row!["#", "created_on", "task", "progress"]);
+        }
+        if let Some((progress, remaining)) = line.split_once("| ") {
+            if let Some((timestamp, task)) = remaining.split_once("| ") {
+                table.add_row(row![index, timestamp, task, progress]);
+                index += 1;
+            }
+        };
+    }
+    if !flag {
+        table.printstd();
+    } else {
+        eprintln!(
+            r#"
+            ++===============================================++
+            ++ You haven't added anything to suchi yet.      ++
+            ++ Use --help to know more about suchi. :)       ++
+            ++===============================================++
+            "#
+        );
+    }
 }
 
 fn clear(suchi_path: &str) {
@@ -362,6 +390,54 @@ fn filter(suchi_path: &str, args: &[String]) {
     print_table(&filter_lines);
 }
 
+fn search(suchi_path: &str, args: &[String]) {
+    if args.is_empty() {
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++`suchi filter` command takes at least 1 argument. ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#
+        );
+        process::exit(1);
+    }
+    // Todo: Right Now we only support single keyword search
+    if args.len() > 1 {
+        eprintln!(
+            r#"
+            ++==================================================++
+            ++ Unrecognize commands: {:?}                       ++
+            ++ Use --help to know more about suchi. :)          ++
+            ++==================================================++
+            "#,
+            &args[2..]
+        );
+        process::exit(1);
+    }
+
+    let keyword = &args[0].to_lowercase();
+    let reader = BufReader::new(
+        OpenOptions::new()
+            .read(true)
+            .open(suchi_path)
+            .expect("Couldn't able to perform action."),
+    );
+    let lines: Vec<String> = reader
+        .lines()
+        .collect::<Result<_, _>>()
+        .expect("Unable to read file.");
+
+    let mut filter_lines: Vec<String> = vec![];
+    for line in &lines {
+        let result = line.to_lowercase().find(keyword);
+        if let Some(_) = result {
+            filter_lines.push(line.to_string())
+        }
+    }   
+    print_table(&filter_lines);
+}
+
 const HELP: &str = r#"
  ___ _   _  ___| |__ (_)
 / __| | | |/ __| '_ \| |
@@ -442,7 +518,7 @@ fn print_table(lines: &Vec<String>) {
         eprintln!(
             r#"
             ++===============================================++
-            ++ You haven't added anything to suchi yet.      ++
+            ++ unable to find anything related               ++
             ++ Use --help to know more about suchi. :)       ++
             ++===============================================++
             "#
