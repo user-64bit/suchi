@@ -395,7 +395,7 @@ fn search(suchi_path: &str, args: &[String]) {
         eprintln!(
             r#"
             ++==================================================++
-            ++`suchi filter` command takes at least 1 argument. ++
+            ++`suchi search` command takes at least 1 argument. ++
             ++ Use --help to know more about suchi. :)          ++
             ++==================================================++
             "#
@@ -479,6 +479,9 @@ suchi is your fast, simple, and efficient task organizer written in Rust!
 - delete [INDEXs]
     Remove a task/tasks by its index.
     Example: suchi delete 4 5 (removes the fourth and fifth task)
+- search [text]
+    search task by providing text
+    Example: suchi search Watch (shows task with "Watch" word in it.)
 
 - clear
     Remove all tasks in one go.
