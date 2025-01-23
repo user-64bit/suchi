@@ -49,6 +49,10 @@ git clone https://github.com/user-64bit/suchi.git && cd suchi && cargo install
     Remove a task/tasks by its index.
     Example: suchi delete 4 5 (removes the fourth and fifth task)
 
+- search [text]
+    search task by providing text
+    Example: suchi search Watch (shows task with "Watch" word in it.)
+
 - clear
     Remove all tasks in one go.
     Example: suchi clear
